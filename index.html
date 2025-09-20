@@ -73,7 +73,8 @@
 </div>
 
 <script>
-const tg = window.Telegram?.WebApp; if (tg){ try{ tg.expand(); tg.ready(); }catch{} }
+const tg = window.Telegram?.WebApp;
+try{ tg?.expand(); tg?.ready(); }catch{}
 
 const services = [
   { id:"cut_male",  title:{ru:"Стрижка мужская", kz:"Ерлерге шаш қию"}, price:4000, time:40, img:"https://images.unsplash.com/photo-1572417884807-5c0fcc0d10f6?q=80&w=1200&auto=format&fit=crop" },
@@ -283,8 +284,15 @@ function renderInfo(){
   card.appendChild(r); elInfo.appendChild(card);
 }
 
+function canSend(){ return !!(tg && typeof tg.sendData === "function"); }
+
 document.getElementById("btn-send").addEventListener("click", ()=>{
   if(!(state.serviceId && state.masterId && state.dateISO && state.time)) return;
+
+  if (!canSend()){
+    alert("Эта среда не поддерживает отправку в бота.\nОткройте мини-аппу через кнопку у бота в Telegram.");
+    return;
+  }
 
   const service = services.find(s=>s.id===state.serviceId);
   const master  = masters.find(m=>m.id===state.masterId);
@@ -308,15 +316,11 @@ document.getElementById("btn-send").addEventListener("click", ()=>{
   };
 
   try{
-    if (tg && typeof tg.sendData === "function"){
-      tg.HapticFeedback?.impactOccurred?.("light");
-      tg.sendData(JSON.stringify(payload));
-      tg.showAlert?.(i18n[LANG].booked_ok);
-    } else {
-      alert("Откройте мини-аппу через кнопку у бота. В браузере отправка недоступна.");
-    }
+    tg.HapticFeedback?.impactOccurred?.("light");
+    tg.sendData(JSON.stringify(payload));
+    tg.showAlert?.(i18n[LANG].booked_ok);
   }catch(e){
-    alert("Send error: " + e.message);
+    tg.showAlert?.("Send error: " + e);
   }
 });
 

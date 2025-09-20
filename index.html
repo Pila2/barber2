@@ -41,6 +41,7 @@
     .alert{padding:10px;border-radius:12px;border:1px solid var(--stroke);background:#11151c}
     .empty{padding:16px;text-align:center;color:var(--muted)}
     .hidden{display:none !important}
+    .small{font-size:12px;color:var(--muted)}
   </style>
 </head>
 <body>
@@ -76,6 +77,11 @@
 const tg = window.Telegram?.WebApp;
 try{ tg?.expand(); tg?.ready(); }catch{}
 
+/* ===== НАСТРОЙКИ API (замени на свои) ===== */
+const API_BASE = "https://your-server.tld:8080/api";
+const API_TOKEN = "replace-with-long-random-string";
+
+/* ===== ДАННЫЕ ===== */
 const services = [
   { id:"cut_male",  title:{ru:"Стрижка мужская", kz:"Ерлерге шаш қию"}, price:4000, time:40, img:"https://images.unsplash.com/photo-1572417884807-5c0fcc0d10f6?q=80&w=1200&auto=format&fit=crop" },
   { id:"cut_kid",   title:{ru:"Стрижка детская",  kz:"Балаларға шаш қию"}, price:3000, time:40, img:"https://images.unsplash.com/photo-1604079628040-94301bb21b91?q=80&w=1200&auto=format&fit=crop" },
@@ -94,7 +100,7 @@ const i18n = {
         your_name:"Ваше имя", your_phone:"Телефон", comment:"Комментарий (необязательно)",
         send_to_bot:"Записаться", empty_slots:"На выбранный день свободных слотов нет.",
         booked_ok:"Запрос отправлен. Вернитесь в чат для подтверждения 👌",
-        info_text:"Мы работаем с 09:00 до 17:00. Обед 13:00–14:00. Шаг записи 40 минут." },
+        info_text:"Мы работаем с 09:00–17:00. Обед 13:00–14:00. Шаг 40 минут." },
   kz: { brand:"BARBER", tab_services:"Қызметтер", tab_masters:"Шеберлер", tab_book:"Жазылу", tab_info:"Ақпарат",
         choose_service:"Қызметті таңдаңыз", choose_master:"Шеберді таңдаңыз", choose_date:"Күнді таңдаңыз", choose_time:"Уақытты таңдаңыз",
         your_name:"Атыңыз", your_phone:"Телефон", comment:"Түсініктеме (міндетті емес)",
@@ -106,6 +112,7 @@ const i18n = {
 let LANG = "ru";
 const WORK_START=9, WORK_END=17, LUNCH_FROM=13, LUNCH_TO=14, SLOT_MIN=40;
 
+/* ===== SLOT HELPERS ===== */
 function fmt2(n){return n<10?("0"+n):(""+n)}
 function addDays(d,days){const x=new Date(d);x.setDate(x.getDate()+days);return x}
 function range(n){return Array.from({length:n},(_,i)=>i)}
@@ -122,7 +129,15 @@ function genSlots(date){
   return slots;
 }
 
-const state = { serviceId:null, masterId:null, dateISO:null, time:null, name:"", phone:"", comment:"", booked:new Set() };
+/* ===== STATE ===== */
+const state = {
+  serviceId:null, masterId:null, dateISO:null, time:null,
+  name:"", phone:"", comment:"",
+  // хранит пометки занятости: ключ `${date}|${time}|${master}`
+  booked:new Set(),
+  // флаги загрузки
+  loading:false, loadKey:null
+};
 
 const elServices = document.getElementById("services");
 const elMasters  = document.getElementById("masters");
@@ -132,12 +147,15 @@ const elFooter   = document.getElementById("footer");
 const elSend     = document.getElementById("btn-send");
 
 function t(key){ return i18n[LANG][key] || key }
-function setLang(lang){ LANG=lang; document.querySelectorAll("[data-i]").forEach(n=>n.textContent=t(n.dataset.i));
+function setLang(lang){
+  LANG=lang;
+  document.querySelectorAll("[data-i]").forEach(n=>n.textContent=t(n.dataset.i));
   document.getElementById("lang-ru").classList.toggle("active", LANG==="ru");
   document.getElementById("lang-kz").classList.toggle("active", LANG==="kz");
   renderTabs(); renderServices(); renderMasters(); renderBook(); renderInfo();
 }
-function switchTab(tab){ document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active", x.dataset.tab===tab));
+function switchTab(tab){
+  document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active", x.dataset.tab===tab));
   ["services","masters","book","info"].forEach(id=>document.getElementById(id).classList.toggle("hidden", id!==tab));
   elFooter.classList.toggle("hidden", tab!=="book");
 }
@@ -150,6 +168,7 @@ function renderTabs(){
   elSend.querySelector("span").textContent=t("send_to_bot");
 }
 
+/* ===== UI: SERVICES ===== */
 function renderServices(){
   elServices.innerHTML = "";
   const card = document.createElement("div"); card.className="card";
@@ -169,6 +188,7 @@ function renderServices(){
   elServices.appendChild(card);
 }
 
+/* ===== UI: MASTERS ===== */
 function renderMasters(){
   elMasters.innerHTML="";
   const card = document.createElement("div"); card.className="card";
@@ -179,7 +199,7 @@ function renderMasters(){
     const h=document.createElement("div"); h.className="h"; h.textContent=m.name[LANG];
     const about=document.createElement("div"); about.className="muted"; about.textContent=m.about[LANG];
     const btn=document.createElement("button"); btn.className="btn"; btn.textContent=LANG==="ru"?"Выбрать":"Таңдау";
-    btn.onclick=()=>{ state.masterId=m.id; switchTab("book"); renderBook(); };
+    btn.onclick=()=>{ state.masterId=m.id; state.time=null; maybeLoadBooked(); switchTab("book"); renderBook(); };
     g.appendChild(h); g.appendChild(about);
     row.appendChild(media); row.appendChild(g); row.appendChild(btn);
     card.appendChild(row);
@@ -187,8 +207,44 @@ function renderMasters(){
   elMasters.appendChild(card);
 }
 
+/* ===== API: загрузка занятых ===== */
+async function loadBooked(dateISO, masterId){
+  state.loading = true;
+  state.loadKey = `${dateISO}|${masterId}`;
+  renderBook(); // показать "загрузка"
+  try{
+    const url = `${API_BASE}/slots?date=${encodeURIComponent(dateISO)}&master=${encodeURIComponent(masterId)}&token=${encodeURIComponent(API_TOKEN)}`;
+    const res = await fetch(url, {method:"GET"});
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    // очистим старые пометки для этого дня/мастера
+    for (const key of Array.from(state.booked)) {
+      if (key.startsWith(`${dateISO}|`) && key.endsWith(`|${masterId}`)) state.booked.delete(key);
+    }
+    // проставим занятое
+    (data.booked||[]).forEach(tm=>{
+      state.booked.add(`${dateISO}|${tm}|${masterId}`);
+    });
+  }catch(e){
+    console.warn("slots fetch error:", e);
+  }finally{
+    state.loading = false;
+    renderBook();
+  }
+}
+
+function maybeLoadBooked(){
+  if (state.dateISO && state.masterId){
+    // подгружаем каждый раз при смене даты/мастера
+    loadBooked(state.dateISO, state.masterId);
+  }
+}
+
+/* ===== UI: BOOK ===== */
 function renderBook(){
   elBook.innerHTML="";
+
   const cardSrv = document.createElement("div"); cardSrv.className="card";
   const r1 = document.createElement("div"); r1.className="row";
   r1.innerHTML = `<div class="grow"><div class="h">${t("choose_service")}</div><div class="muted">${services.find(x=>x.id===state.serviceId)?.title[LANG] || "-"}</div></div>`;
@@ -214,7 +270,7 @@ function renderBook(){
     const txt = `${fmt2(d.getDate())}.${fmt2(d.getMonth()+1)}.${d.getFullYear().toString().slice(2)}`;
     const pill=document.createElement("div"); pill.className="pill"; pill.textContent=txt;
     if(state.dateISO===iso) pill.classList.add("active");
-    pill.onclick=()=>{ state.dateISO=iso; state.time=null; renderBook(); };
+    pill.onclick=()=>{ state.dateISO=iso; state.time=null; maybeLoadBooked(); renderBook(); };
     g.appendChild(pill);
   }
   cardDate.appendChild(g);
@@ -223,11 +279,15 @@ function renderBook(){
   const cardTime=document.createElement("div"); cardTime.className="card";
   const rtt=document.createElement("div"); rtt.className="row"; rtt.innerHTML=`<div class="h">${t("choose_time")}</div>`;
   cardTime.appendChild(rtt);
+
   const timesWrap=document.createElement("div"); timesWrap.className="row"; timesWrap.style.flexWrap="wrap"; timesWrap.style.gap="10px";
-  if(state.dateISO){
+  if (state.loading && state.dateISO && state.masterId){
+    const small=document.createElement("div"); small.className="small"; small.textContent="Загружаем свободное время…";
+    timesWrap.appendChild(small);
+  } else if(state.dateISO && state.masterId){
     const [y,m,d]=state.dateISO.split("-").map(Number);
     const slots = genSlots(new Date(y, m-1, d))
-      .filter(tm => !state.booked.has(`${state.dateISO}|${tm}|${state.masterId||"-"}`));
+      .filter(tm => !state.booked.has(`${state.dateISO}|${tm}|${state.masterId}`)); // ← скрываем занятое
     if(!slots.length){
       const empty=document.createElement("div"); empty.className="empty"; empty.textContent=t("empty_slots");
       timesWrap.appendChild(empty);
@@ -276,6 +336,7 @@ function renderBook(){
   },0);
 }
 
+/* ===== INFO ===== */
 function renderInfo(){
   elInfo.innerHTML="";
   const card=document.createElement("div"); card.className="card";
@@ -284,6 +345,7 @@ function renderInfo(){
   card.appendChild(r); elInfo.appendChild(card);
 }
 
+/* ===== SEND TO BOT ===== */
 function canSend(){ return !!(tg && typeof tg.sendData === "function"); }
 
 document.getElementById("btn-send").addEventListener("click", ()=>{
@@ -324,6 +386,7 @@ document.getElementById("btn-send").addEventListener("click", ()=>{
   }
 });
 
+/* ===== INIT & NAV ===== */
 document.querySelectorAll(".tab").forEach(el=>el.addEventListener("click", ()=> switchTab(el.dataset.tab)));
 document.getElementById("lang-ru").onclick=()=>setLang("ru");
 document.getElementById("lang-kz").onclick=()=>setLang("kz");

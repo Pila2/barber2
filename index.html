@@ -6,10 +6,7 @@
   <title>Barber | Запись</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
-    :root{
-      --bg:#0f1115; --card:#151a21; --stroke:#212833; --text:#e7ecf3; --muted:#94a3b8;
-      --primary:#22c55e; --accent:#f59e0b; --danger:#ef4444; --radius:16px;
-    }
+    :root{ --bg:#0f1115; --card:#151a21; --stroke:#212833; --text:#e7ecf3; --muted:#94a3b8; --primary:#22c55e; --accent:#f59e0b; --danger:#ef4444; --radius:16px; }
     *{box-sizing:border-box}
     html,body{height:100%;background:var(--bg);color:var(--text);margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
     .wrap{max-width:420px;margin:0 auto;min-height:100%;display:flex;flex-direction:column}
@@ -74,14 +71,13 @@
 </div>
 
 <script>
-const tg = window.Telegram?.WebApp;
-try{ tg?.expand(); tg?.ready(); }catch{}
+const tg = window.Telegram?.WebApp; try{ tg?.expand(); tg?.ready(); }catch{}
 
-/* ===== НАСТРОЙКИ API (замени на свои) ===== */
-const API_BASE = "https://your-server.tld:8080/api";
-const API_TOKEN = "replace-with-long-random-string";
+// === API НАСТРОЙКИ ===
+// УКАЖИТЕ публичный адрес вашего сервера с ботом:
+const API_BASE = "https://YOUR_PUBLIC_HOST_OR_IP:8080/api";
+const API_TOKEN = "dev-secret-change-me"; // = API_SECRET из .env
 
-/* ===== ДАННЫЕ ===== */
 const services = [
   { id:"cut_male",  title:{ru:"Стрижка мужская", kz:"Ерлерге шаш қию"}, price:4000, time:40, img:"https://images.unsplash.com/photo-1572417884807-5c0fcc0d10f6?q=80&w=1200&auto=format&fit=crop" },
   { id:"cut_kid",   title:{ru:"Стрижка детская",  kz:"Балаларға шаш қию"}, price:3000, time:40, img:"https://images.unsplash.com/photo-1604079628040-94301bb21b91?q=80&w=1200&auto=format&fit=crop" },
@@ -111,33 +107,20 @@ const i18n = {
 
 let LANG = "ru";
 const WORK_START=9, WORK_END=17, LUNCH_FROM=13, LUNCH_TO=14, SLOT_MIN=40;
-
-/* ===== SLOT HELPERS ===== */
 function fmt2(n){return n<10?("0"+n):(""+n)}
 function addDays(d,days){const x=new Date(d);x.setDate(x.getDate()+days);return x}
 function range(n){return Array.from({length:n},(_,i)=>i)}
 function genSlots(date){
-  const slots=[];
-  const base = new Date(date.getFullYear(), date.getMonth(), date.getDate(), WORK_START, 0, 0);
+  const slots=[]; const base = new Date(date.getFullYear(), date.getMonth(), date.getDate(), WORK_START, 0, 0);
   for(let t=new Date(base); t.getHours()<WORK_END; t=new Date(t.getTime()+SLOT_MIN*60000)){
     const end = new Date(t.getTime()+SLOT_MIN*60000);
     const overlapsLunch = !(end.getHours()<LUNCH_FROM || t.getHours()>=LUNCH_TO);
-    if(!overlapsLunch && end.getHours()<=WORK_END){
-      slots.push(`${fmt2(t.getHours())}:${fmt2(t.getMinutes())}`);
-    }
+    if(!overlapsLunch && end.getHours()<=WORK_END){ slots.push(`${fmt2(t.getHours())}:${fmt2(t.getMinutes())}`); }
   }
   return slots;
 }
 
-/* ===== STATE ===== */
-const state = {
-  serviceId:null, masterId:null, dateISO:null, time:null,
-  name:"", phone:"", comment:"",
-  // хранит пометки занятости: ключ `${date}|${time}|${master}`
-  booked:new Set(),
-  // флаги загрузки
-  loading:false, loadKey:null
-};
+const state = { serviceId:null, masterId:null, dateISO:null, time:null, name:"", phone:"", comment:"", booked:new Set(), loading:false };
 
 const elServices = document.getElementById("services");
 const elMasters  = document.getElementById("masters");
@@ -147,33 +130,23 @@ const elFooter   = document.getElementById("footer");
 const elSend     = document.getElementById("btn-send");
 
 function t(key){ return i18n[LANG][key] || key }
-function setLang(lang){
-  LANG=lang;
-  document.querySelectorAll("[data-i]").forEach(n=>n.textContent=t(n.dataset.i));
+function setLang(lang){ LANG=lang; document.querySelectorAll("[data-i]").forEach(n=>n.textContent=t(n.dataset.i));
   document.getElementById("lang-ru").classList.toggle("active", LANG==="ru");
   document.getElementById("lang-kz").classList.toggle("active", LANG==="kz");
-  renderTabs(); renderServices(); renderMasters(); renderBook(); renderInfo();
-}
-function switchTab(tab){
-  document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active", x.dataset.tab===tab));
+  renderTabs(); renderServices(); renderMasters(); renderBook(); renderInfo(); }
+function switchTab(tab){ document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active", x.dataset.tab===tab));
   ["services","masters","book","info"].forEach(id=>document.getElementById(id).classList.toggle("hidden", id!==tab));
-  elFooter.classList.toggle("hidden", tab!=="book");
-}
+  elFooter.classList.toggle("hidden", tab!=="book"); }
 function renderTabs(){
   document.querySelector('[data-tab="services"]').textContent=t("tab_services");
   document.querySelector('[data-tab="masters"]').textContent=t("tab_masters");
   document.querySelector('[data-tab="book"]').textContent=t("tab_book");
   document.querySelector('[data-tab="info"]').textContent=t("tab_info");
   document.querySelector('.title').textContent=t("brand");
-  elSend.querySelector("span").textContent=t("send_to_bot");
-}
+  elSend.querySelector("span").textContent=t("send_to_bot"); }
 
-/* ===== UI: SERVICES ===== */
-function renderServices(){
-  elServices.innerHTML = "";
-  const card = document.createElement("div"); card.className="card";
-  services.forEach(s=>{
-    const row = document.createElement("div"); row.className="row";
+function renderServices(){ elServices.innerHTML = ""; const card = document.createElement("div"); card.className="card";
+  services.forEach(s=>{ const row = document.createElement("div"); row.className="row";
     const media = document.createElement("div"); media.className="media"; media.style.backgroundImage=`url('${s.img}')`;
     const g = document.createElement("div"); g.className="grow";
     const h = document.createElement("div"); h.className="h"; h.textContent=s.title[LANG];
@@ -183,17 +156,10 @@ function renderServices(){
     btn.onclick=()=>{ state.serviceId=s.id; switchTab("book"); renderBook(); };
     g.appendChild(h); g.appendChild(m); g.appendChild(p);
     row.appendChild(media); row.appendChild(g); row.appendChild(btn);
-    card.appendChild(row);
-  });
-  elServices.appendChild(card);
-}
+    card.appendChild(row); }); elServices.appendChild(card); }
 
-/* ===== UI: MASTERS ===== */
-function renderMasters(){
-  elMasters.innerHTML="";
-  const card = document.createElement("div"); card.className="card";
-  masters.forEach(m=>{
-    const row=document.createElement("div"); row.className="row";
+function renderMasters(){ elMasters.innerHTML=""; const card = document.createElement("div"); card.className="card";
+  masters.forEach(m=>{ const row=document.createElement("div"); row.className="row";
     const media = document.createElement("div"); media.className="media"; media.style.backgroundImage=`url('${m.img}')`;
     const g=document.createElement("div"); g.className="grow";
     const h=document.createElement("div"); h.className="h"; h.textContent=m.name[LANG];
@@ -202,194 +168,108 @@ function renderMasters(){
     btn.onclick=()=>{ state.masterId=m.id; state.time=null; maybeLoadBooked(); switchTab("book"); renderBook(); };
     g.appendChild(h); g.appendChild(about);
     row.appendChild(media); row.appendChild(g); row.appendChild(btn);
-    card.appendChild(row);
-  });
-  elMasters.appendChild(card);
-}
+    card.appendChild(row); }); elMasters.appendChild(card); }
 
-/* ===== API: загрузка занятых ===== */
 async function loadBooked(dateISO, masterId){
-  state.loading = true;
-  state.loadKey = `${dateISO}|${masterId}`;
-  renderBook(); // показать "загрузка"
+  if(!API_BASE) return; state.loading = true; renderBook();
   try{
     const url = `${API_BASE}/slots?date=${encodeURIComponent(dateISO)}&master=${encodeURIComponent(masterId)}&token=${encodeURIComponent(API_TOKEN)}`;
     const res = await fetch(url, {method:"GET"});
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-
-    // очистим старые пометки для этого дня/мастера
     for (const key of Array.from(state.booked)) {
       if (key.startsWith(`${dateISO}|`) && key.endsWith(`|${masterId}`)) state.booked.delete(key);
     }
-    // проставим занятое
-    (data.booked||[]).forEach(tm=>{
-      state.booked.add(`${dateISO}|${tm}|${masterId}`);
-    });
-  }catch(e){
-    console.warn("slots fetch error:", e);
-  }finally{
-    state.loading = false;
-    renderBook();
-  }
+    (data.booked||[]).forEach(tm=>{ state.booked.add(`${dateISO}|${tm}|${masterId}`); });
+  }catch(e){ console.warn("slots fetch error:", e); }
+  finally{ state.loading = false; renderBook(); }
 }
+function maybeLoadBooked(){ if (state.dateISO && state.masterId){ loadBooked(state.dateISO, state.masterId); } }
 
-function maybeLoadBooked(){
-  if (state.dateISO && state.masterId){
-    // подгружаем каждый раз при смене даты/мастера
-    loadBooked(state.dateISO, state.masterId);
-  }
-}
-
-/* ===== UI: BOOK ===== */
-function renderBook(){
-  elBook.innerHTML="";
-
+function renderBook(){ elBook.innerHTML="";
   const cardSrv = document.createElement("div"); cardSrv.className="card";
   const r1 = document.createElement("div"); r1.className="row";
   r1.innerHTML = `<div class="grow"><div class="h">${t("choose_service")}</div><div class="muted">${services.find(x=>x.id===state.serviceId)?.title[LANG] || "-"}</div></div>`;
-  const btnSrv=document.createElement("button"); btnSrv.className="btn"; btnSrv.textContent=t("tab_services");
-  btnSrv.onclick=()=>switchTab("services");
+  const btnSrv=document.createElement("button"); btnSrv.className="btn"; btnSrv.textContent=t("tab_services"); btnSrv.onclick=()=>switchTab("services");
   r1.appendChild(btnSrv); cardSrv.appendChild(r1);
 
   const r2 = document.createElement("div"); r2.className="row";
   r2.innerHTML = `<div class="grow"><div class="h">${t("choose_master")}</div><div class="muted">${masters.find(x=>x.id===state.masterId)?.name[LANG] || "-"}</div></div>`;
-  const btnMs=document.createElement("button"); btnMs.className="btn"; btnMs.textContent=t("tab_masters");
-  btnMs.onclick=()=>switchTab("masters");
-  r2.appendChild(btnMs); cardSrv.appendChild(r2);
-  elBook.appendChild(cardSrv);
+  const btnMs=document.createElement("button"); btnMs.className="btn"; btnMs.textContent=t("tab_masters"); btnMs.onclick=()=>switchTab("masters");
+  r2.appendChild(btnMs); cardSrv.appendChild(r2); elBook.appendChild(cardSrv);
 
   const cardDate = document.createElement("div"); cardDate.className="card";
-  const rr = document.createElement("div"); rr.className="row"; rr.innerHTML=`<div class="h">${t("choose_date")}</div>`;
-  cardDate.appendChild(rr);
+  const rr = document.createElement("div"); rr.className="row"; rr.innerHTML=`<div class="h">${t("choose_date")}</div>`; cardDate.appendChild(rr);
   const g = document.createElement("div"); g.className="row"; g.style.flexWrap="wrap"; g.style.gap="10px";
   const today = new Date();
   for(const i of range(14)){
-    const d = addDays(today,i);
-    const iso = d.toISOString().slice(0,10);
+    const d = addDays(today,i); const iso = d.toISOString().slice(0,10);
     const txt = `${fmt2(d.getDate())}.${fmt2(d.getMonth()+1)}.${d.getFullYear().toString().slice(2)}`;
     const pill=document.createElement("div"); pill.className="pill"; pill.textContent=txt;
     if(state.dateISO===iso) pill.classList.add("active");
     pill.onclick=()=>{ state.dateISO=iso; state.time=null; maybeLoadBooked(); renderBook(); };
     g.appendChild(pill);
   }
-  cardDate.appendChild(g);
-  elBook.appendChild(cardDate);
+  cardDate.appendChild(g); elBook.appendChild(cardDate);
 
   const cardTime=document.createElement("div"); cardTime.className="card";
-  const rtt=document.createElement("div"); rtt.className="row"; rtt.innerHTML=`<div class="h">${t("choose_time")}</div>`;
-  cardTime.appendChild(rtt);
-
+  const rtt=document.createElement("div"); rtt.className="row"; rtt.innerHTML=`<div class="h">${t("choose_time")}</div>`; cardTime.appendChild(rtt);
   const timesWrap=document.createElement("div"); timesWrap.className="row"; timesWrap.style.flexWrap="wrap"; timesWrap.style.gap="10px";
+
   if (state.loading && state.dateISO && state.masterId){
     const small=document.createElement("div"); small.className="small"; small.textContent="Загружаем свободное время…";
     timesWrap.appendChild(small);
   } else if(state.dateISO && state.masterId){
     const [y,m,d]=state.dateISO.split("-").map(Number);
     const slots = genSlots(new Date(y, m-1, d))
-      .filter(tm => !state.booked.has(`${state.dateISO}|${tm}|${state.masterId}`)); // ← скрываем занятое
-    if(!slots.length){
-      const empty=document.createElement("div"); empty.className="empty"; empty.textContent=t("empty_slots");
-      timesWrap.appendChild(empty);
-    } else {
-      slots.forEach(tm=>{
-        const pill=document.createElement("div"); pill.className="pill"; pill.textContent=tm;
-        if(state.time===tm) pill.classList.add("active");
-        pill.onclick=()=>{ state.time=tm; renderBook(); };
-        timesWrap.appendChild(pill);
-      });
-    }
-  } else {
-    const hint=document.createElement("div"); hint.className="muted"; hint.textContent="—";
-    timesWrap.appendChild(hint);
-  }
+      .filter(tm => !state.booked.has(`${state.dateISO}|${tm}|${state.masterId}`));
+    if(!slots.length){ const empty=document.createElement("div"); empty.className="empty"; empty.textContent=t("empty_slots"); timesWrap.appendChild(empty); }
+    else { slots.forEach(tm=>{ const pill=document.createElement("div"); pill.className="pill"; pill.textContent=tm; if(state.time===tm) pill.classList.add("active"); pill.onclick=()=>{ state.time=tm; renderBook(); }; timesWrap.appendChild(pill); }); }
+  } else { const hint=document.createElement("div"); hint.className="muted"; hint.textContent="—"; timesWrap.appendChild(hint); }
   cardTime.appendChild(timesWrap); elBook.appendChild(cardTime);
 
   const cardForm=document.createElement("div"); cardForm.className="card";
   const fr=document.createElement("div"); fr.className="row"; fr.style.flexDirection="column"; fr.style.gap="10px";
   fr.innerHTML = `
-    <div class="field">
-      <label>${t("your_name")}</label>
-      <input class="input" id="inp-name" placeholder="${t("your_name")}" value="${state.name||""}">
-    </div>
-    <div class="field">
-      <label>${t("your_phone")}</label>
-      <input class="input" id="inp-phone" placeholder="+7700..." value="${state.phone||""}">
-    </div>
-    <div class="field">
-      <label>${t("comment")}</label>
-      <input class="input" id="inp-comment" placeholder="${t("comment")}" value="${state.comment||""}">
-    </div>`;
+    <div class="field"><label>${t("your_name")}</label><input class="input" id="inp-name" placeholder="${t("your_name")}" value="${state.name||""}"></div>
+    <div class="field"><label>${t("your_phone")}</label><input class="input" id="inp-phone" placeholder="+7700..." value="${state.phone||""}"></div>
+    <div class="field"><label>${t("comment")}</label><input class="input" id="inp-comment" placeholder="${t("comment")}" value="${state.comment||""}"></div>`;
   cardForm.appendChild(fr); elBook.appendChild(cardForm);
 
-  const alert=document.createElement("div"); alert.className="alert"; alert.textContent=i18n[LANG].info_text;
-  elBook.appendChild(alert);
+  const alert=document.createElement("div"); alert.className="alert"; alert.textContent=i18n[LANG].info_text; elBook.appendChild(alert);
 
   const ok = !!(state.serviceId && state.masterId && state.dateISO && state.time);
   elSend.disabled = !ok; elSend.style.opacity = ok ? "1" : ".6";
 
-  setTimeout(()=>{
-    const n=document.getElementById("inp-name"); const p=document.getElementById("inp-phone"); const c=document.getElementById("inp-comment");
-    n.oninput=()=>state.name=n.value.trim();
-    p.oninput=()=>state.phone=p.value.trim();
-    c.oninput=()=>state.comment=c.value.trim();
-  },0);
+  setTimeout(()=>{ const n=document.getElementById("inp-name"); const p=document.getElementById("inp-phone"); const c=document.getElementById("inp-comment");
+    n.oninput=()=>state.name=n.value.trim(); p.oninput=()=>state.phone=p.value.trim(); c.oninput=()=>state.comment=c.value.trim(); },0);
 }
 
-/* ===== INFO ===== */
-function renderInfo(){
-  elInfo.innerHTML="";
-  const card=document.createElement("div"); card.className="card";
-  const r=document.createElement("div"); r.className="row";
-  r.innerHTML = `<div><div class="h">BARBER</div><div class="muted">${i18n[LANG].info_text}</div><div class="muted" style="margin-top:8px">Тел.: +7 700 000-00-00 · Адрес: г. Костанай</div></div>`;
-  card.appendChild(r); elInfo.appendChild(card);
-}
+function renderInfo(){ elInfo.innerHTML=""; const card=document.createElement("div"); card.className="card";
+  const r=document.createElement("div"); r.className="row"; r.innerHTML = `<div><div class="h">BARBER</div><div class="muted">${i18n[LANG].info_text}</div><div class="muted" style="margin-top:8px">Тел.: +7 700 000-00-00 · Адрес: г. Костанай</div></div>`;
+  card.appendChild(r); elInfo.appendChild(card); }
 
-/* ===== SEND TO BOT ===== */
 function canSend(){ return !!(tg && typeof tg.sendData === "function"); }
 
 document.getElementById("btn-send").addEventListener("click", ()=>{
   if(!(state.serviceId && state.masterId && state.dateISO && state.time)) return;
-
-  if (!canSend()){
-    alert("Эта среда не поддерживает отправку в бота.\nОткройте мини-аппу через кнопку у бота в Telegram.");
-    return;
-  }
-
-  const service = services.find(s=>s.id===state.serviceId);
-  const master  = masters.find(m=>m.id===state.masterId);
-
-  const payload = {
-    type: "barber_booking",
-    lang: LANG,
-    customer_name: state.name || "",
-    phone: state.phone || "",
-    comment: state.comment || "",
-    booking: {
-      service_id: state.serviceId,
-      service_title: service ? service.title[LANG] : "",
-      price: service ? service.price : 0,
-      duration_min: service ? service.time : 40,
-      master_id: state.masterId,
-      master_name: master ? master.name[LANG] : "",
-      date: state.dateISO,
-      time: state.time
-    }
-  };
-
-  try{
-    tg.HapticFeedback?.impactOccurred?.("light");
-    tg.sendData(JSON.stringify(payload));
-    tg.showAlert?.(i18n[LANG].booked_ok);
-  }catch(e){
-    tg.showAlert?.("Send error: " + e);
-  }
+  if (!canSend()){ alert("Откройте мини-аппу через кнопку у бота в Telegram."); return; }
+  const service = services.find(s=>s.id===state.serviceId); const master  = masters.find(m=>m.id===state.masterId);
+  const payload = { type: "barber_booking", lang: LANG, customer_name: state.name||"", phone: state.phone||"", comment: state.comment||"",
+    booking: { service_id: state.serviceId, service_title: service?service.title[LANG]:"", price: service?service.price:0, duration_min: service?service.time:40,
+               master_id: state.masterId, master_name: master?master.name[LANG]:"", date: state.dateISO, time: state.time } };
+  try{ tg.HapticFeedback?.impactOccurred?.("light"); tg.sendData(JSON.stringify(payload)); tg.showAlert?.(i18n[LANG].booked_ok); }
+  catch(e){ tg.showAlert?.("Send error: " + e); }
 });
 
-/* ===== INIT & NAV ===== */
 document.querySelectorAll(".tab").forEach(el=>el.addEventListener("click", ()=> switchTab(el.dataset.tab)));
 document.getElementById("lang-ru").onclick=()=>setLang("ru");
 document.getElementById("lang-kz").onclick=()=>setLang("kz");
+
+function renderMastersList(){ renderMasters(); }
+function renderServicesList(){ renderServices(); }
+
+function renderTabs(){ /* заменяется в setLang() */ }
 
 setLang("ru"); switchTab("services");
 (function init(){ renderServices(); renderMasters(); renderBook(); renderInfo(); })();

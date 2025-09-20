@@ -2,16 +2,13 @@
 <html lang="ru">
 <head>
   <meta charset="utf-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover"
-  />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
   <title>Barber | Запись</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
     :root{
       --bg:#0f1115; --card:#151a21; --stroke:#212833; --text:#e7ecf3; --muted:#94a3b8;
-      --primary:#22c55e; --accent:#f59e0b; --danger:#ef4444;
-      --radius:16px;
+      --primary:#22c55e; --accent:#f59e0b; --danger:#ef4444; --radius:16px;
     }
     *{box-sizing:border-box}
     html,body{height:100%;background:var(--bg);color:var(--text);margin:0;font-family:Inter,system-ui,Segoe UI,Roboto,Arial}
@@ -36,18 +33,13 @@
     .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:12px;border:1px solid var(--stroke);background:#0d1218;padding:10px 12px;color:var(--text);cursor:pointer}
     .btn.primary{background:var(--primary);border-color:var(--primary);color:#04120a;font-weight:700}
     .btn.full{width:100%}
-    .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-    .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
     .pill{border:1px solid var(--stroke);padding:10px;border-radius:999px;text-align:center;cursor:pointer;color:var(--muted)}
     .pill.active{background:var(--primary);border-color:var(--primary);color:#06120a;font-weight:700}
     .foot{position:sticky;bottom:0;background:linear-gradient(180deg,rgba(15,17,21,0),var(--bg) 25%,var(--bg));padding:12px 14px;border-top:1px solid var(--stroke);display:flex;gap:10px}
     .field{display:flex;flex-direction:column;gap:6px}
     .input{background:#0d1218;border:1px solid var(--stroke);border-radius:12px;padding:10px 12px;color:var(--text);outline:none}
     .alert{padding:10px;border-radius:12px;border:1px solid var(--stroke);background:#11151c}
-    .ok{color:var(--primary)}
-    .warn{color:var(--danger)}
     .empty{padding:16px;text-align:center;color:var(--muted)}
-    .kz{display:none}
     .hidden{display:none !important}
   </style>
 </head>
@@ -68,36 +60,27 @@
     <div class="tab" data-tab="info" data-i="tab_info">Инфо</div>
   </div>
 
-  <!-- CONTENT -->
   <div id="services" class="content"></div>
   <div id="masters" class="content hidden"></div>
   <div id="book" class="content hidden"></div>
   <div id="info" class="content hidden"></div>
 
-  <!-- FOOTER (для брони) -->
   <div id="footer" class="foot hidden">
     <button id="btn-send" class="btn primary full">
-      <span data-i="send_to_bot">Отправить запись в бот</span>
+      <span data-i="send_to_bot">Записаться</span>
     </button>
   </div>
 </div>
 
 <script>
-/* ===== Telegram WebApp API ===== */
-const tg = window.Telegram ? window.Telegram.WebApp : null;
-if (tg) {
-  tg.expand(); // максимально раскрыть
-  tg.disableVerticalSwipes && tg.disableVerticalSwipes();
-}
+const tg = window.Telegram?.WebApp; if (tg){ try{ tg.expand(); tg.ready(); }catch{} }
 
-/* ===== Данные ===== */
 const services = [
   { id:"cut_male",  title:{ru:"Стрижка мужская", kz:"Ерлерге шаш қию"}, price:4000, time:40, img:"https://images.unsplash.com/photo-1572417884807-5c0fcc0d10f6?q=80&w=1200&auto=format&fit=crop" },
-  { id:"cut_kid",   title:{ru:"Стрижка детская", kz:"Балаларға шаш қию"}, price:3000, time:40, img:"https://images.unsplash.com/photo-1604079628040-94301bb21b91?q=80&w=1200&auto=format&fit=crop" },
-  { id:"beard",     title:{ru:"Оформление бороды", kz:"Сақалды қалыптау"}, price:2000, time:40, img:"https://images.unsplash.com/photo-1517833359150-27100a4df43c?q=80&w=1200&auto=format&fit=crop" },
+  { id:"cut_kid",   title:{ru:"Стрижка детская",  kz:"Балаларға шаш қию"}, price:3000, time:40, img:"https://images.unsplash.com/photo-1604079628040-94301bb21b91?q=80&w=1200&auto=format&fit=crop" },
+  { id:"beard",     title:{ru:"Оформление бороды",kz:"Сақалды қалыптау"}, price:2000, time:40, img:"https://images.unsplash.com/photo-1517833359150-27100a4df43c?q=80&w=1200&auto=format&fit=crop" },
   { id:"shave",     title:{ru:"Бритьё опасной бритвой", kz:"Қырыну (устара)"}, price:3000, time:40, img:"https://images.unsplash.com/photo-1622288432159-93068010d99e?q=80&w=1200&auto=format&fit=crop" },
 ];
-
 const masters = [
   { id:"m1", name:{ru:"Андрей", kz:"Андрей"}, about:{ru:"10 лет опыта, классика и fade", kz:"10 жыл тәжірибе, классика және fade"}, rating:4.9, img:"https://images.unsplash.com/photo-1594824476967-48c8b964273f?q=80&w=1200&auto=format&fit=crop" },
   { id:"m2", name:{ru:"Айдос",  kz:"Айдос"},  about:{ru:"Современные формы, борода", kz:"Заманауи стиль, сақал"}, rating:4.8, img:"https://images.unsplash.com/photo-1621605815971-1da1f1d3a4a9?q=80&w=1200&auto=format&fit=crop" },
@@ -105,33 +88,22 @@ const masters = [
 ];
 
 const i18n = {
-  ru: {
-    brand:"BARBER",
-    tab_services:"Услуги", tab_masters:"Мастера", tab_book:"Запись", tab_info:"Инфо",
-    choose_service:"Выберите услугу", choose_master:"Выберите мастера", choose_date:"Выберите дату", choose_time:"Выберите время",
-    your_name:"Ваше имя", your_phone:"Телефон", comment:"Комментарий (необязательно)",
-    send_to_bot:"Отправить запись в бот",
-    empty_slots:"На выбранный день свободных слотов нет.",
-    booked_ok:"Запрос отправлен. Вернитесь в чат для подтверждения 👌",
-    info_text:"Мы работаем с 09:00 до 17:00. Обед 13:00–14:00. Шаг записи 40 минут.",
-  },
-  kz: {
-    brand:"BARBER",
-    tab_services:"Қызметтер", tab_masters:"Шеберлер", tab_book:"Жазылу", tab_info:"Ақпарат",
-    choose_service:"Қызметті таңдаңыз", choose_master:"Шеберді таңдаңыз", choose_date:"Күнді таңдаңыз", choose_time:"Уақытты таңдаңыз",
-    your_name:"Атыңыз", your_phone:"Телефон", comment:"Түсініктеме (міндетті емес)",
-    send_to_bot:"Жазылуды ботқа жіберу",
-    empty_slots:"Таңдалған күні бос уақыт жоқ.",
-    booked_ok:"Өтініш жіберілді. Растау үшін чатқа оралыңыз 👌",
-    info_text:"Жұмыс уақыты 09:00–17:00. Үзіліс 13:00–14:00. Қадам — 40 минут.",
-  }
+  ru: { brand:"BARBER", tab_services:"Услуги", tab_masters:"Мастера", tab_book:"Запись", tab_info:"Инфо",
+        choose_service:"Выберите услугу", choose_master:"Выберите мастера", choose_date:"Выберите дату", choose_time:"Выберите время",
+        your_name:"Ваше имя", your_phone:"Телефон", comment:"Комментарий (необязательно)",
+        send_to_bot:"Записаться", empty_slots:"На выбранный день свободных слотов нет.",
+        booked_ok:"Запрос отправлен. Вернитесь в чат для подтверждения 👌",
+        info_text:"Мы работаем с 09:00 до 17:00. Обед 13:00–14:00. Шаг записи 40 минут." },
+  kz: { brand:"BARBER", tab_services:"Қызметтер", tab_masters:"Шеберлер", tab_book:"Жазылу", tab_info:"Ақпарат",
+        choose_service:"Қызметті таңдаңыз", choose_master:"Шеберді таңдаңыз", choose_date:"Күнді таңдаңыз", choose_time:"Уақытты таңдаңыз",
+        your_name:"Атыңыз", your_phone:"Телефон", comment:"Түсініктеме (міндетті емес)",
+        send_to_bot:"Жазылу", empty_slots:"Таңдалған күні бос уақыт жоқ.",
+        booked_ok:"Өтініш жіберілді. Растау үшін чатқа оралыңыз 👌",
+        info_text:"Жұмыс уақыты 09:00–17:00. Үзіліс 13:00–14:00. Қадам — 40 минут." }
 };
 
 let LANG = "ru";
-
-/* ===== Утилиты времени ===== */
-const TZ_OFFSET_MIN = 0; // календарь локальный, смещение не применяем здесь
-const WORK_START = 9, WORK_END = 17, LUNCH_FROM = 13, LUNCH_TO = 14, SLOT_MIN = 40;
+const WORK_START=9, WORK_END=17, LUNCH_FROM=13, LUNCH_TO=14, SLOT_MIN=40;
 
 function fmt2(n){return n<10?("0"+n):(""+n)}
 function addDays(d,days){const x=new Date(d);x.setDate(x.getDate()+days);return x}
@@ -149,19 +121,8 @@ function genSlots(date){
   return slots;
 }
 
-/* ===== Состояние выбора ===== */
-const state = {
-  serviceId: null,
-  masterId: null,
-  dateISO: null, // YYYY-MM-DD
-  time: null,
-  name: "",
-  phone: "",
-  comment: "",
-  booked: new Set() // занятые слоты, если подгружаешь с сервера — отметишь тут
-};
+const state = { serviceId:null, masterId:null, dateISO:null, time:null, name:"", phone:"", comment:"", booked:new Set() };
 
-/* ===== Рендеринг ===== */
 const elServices = document.getElementById("services");
 const elMasters  = document.getElementById("masters");
 const elBook     = document.getElementById("book");
@@ -170,23 +131,15 @@ const elFooter   = document.getElementById("footer");
 const elSend     = document.getElementById("btn-send");
 
 function t(key){ return i18n[LANG][key] || key }
-
-function setLang(lang){
-  LANG = lang;
-  document.querySelectorAll("[data-i]").forEach(n=>n.textContent = t(n.dataset.i));
+function setLang(lang){ LANG=lang; document.querySelectorAll("[data-i]").forEach(n=>n.textContent=t(n.dataset.i));
   document.getElementById("lang-ru").classList.toggle("active", LANG==="ru");
   document.getElementById("lang-kz").classList.toggle("active", LANG==="kz");
   renderTabs(); renderServices(); renderMasters(); renderBook(); renderInfo();
 }
-
-function switchTab(tab){
-  document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active", x.dataset.tab===tab));
-  ["services","masters","book","info"].forEach(id=>{
-    document.getElementById(id).classList.toggle("hidden", id!==tab);
-  });
+function switchTab(tab){ document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active", x.dataset.tab===tab));
+  ["services","masters","book","info"].forEach(id=>document.getElementById(id).classList.toggle("hidden", id!==tab));
   elFooter.classList.toggle("hidden", tab!=="book");
 }
-
 function renderTabs(){
   document.querySelector('[data-tab="services"]').textContent=t("tab_services");
   document.querySelector('[data-tab="masters"]').textContent=t("tab_masters");
@@ -196,7 +149,6 @@ function renderTabs(){
   elSend.querySelector("span").textContent=t("send_to_bot");
 }
 
-/* SERVICES */
 function renderServices(){
   elServices.innerHTML = "";
   const card = document.createElement("div"); card.className="card";
@@ -216,7 +168,6 @@ function renderServices(){
   elServices.appendChild(card);
 }
 
-/* MASTERS */
 function renderMasters(){
   elMasters.innerHTML="";
   const card = document.createElement("div"); card.className="card";
@@ -235,33 +186,22 @@ function renderMasters(){
   elMasters.appendChild(card);
 }
 
-/* BOOK */
 function renderBook(){
   elBook.innerHTML="";
-
-  // 1. сервис
   const cardSrv = document.createElement("div"); cardSrv.className="card";
   const r1 = document.createElement("div"); r1.className="row";
-  r1.innerHTML = `<div class="grow">
-    <div class="h">${t("choose_service")}</div>
-    <div class="muted">${services.find(x=>x.id===state.serviceId)?.title[LANG] || "-"}</div>
-  </div>`;
+  r1.innerHTML = `<div class="grow"><div class="h">${t("choose_service")}</div><div class="muted">${services.find(x=>x.id===state.serviceId)?.title[LANG] || "-"}</div></div>`;
   const btnSrv=document.createElement("button"); btnSrv.className="btn"; btnSrv.textContent=t("tab_services");
   btnSrv.onclick=()=>switchTab("services");
   r1.appendChild(btnSrv); cardSrv.appendChild(r1);
 
-  // 2. мастер
   const r2 = document.createElement("div"); r2.className="row";
-  r2.innerHTML = `<div class="grow">
-    <div class="h">${t("choose_master")}</div>
-    <div class="muted">${masters.find(x=>x.id===state.masterId)?.name[LANG] || "-"}</div>
-  </div>`;
+  r2.innerHTML = `<div class="grow"><div class="h">${t("choose_master")}</div><div class="muted">${masters.find(x=>x.id===state.masterId)?.name[LANG] || "-"}</div></div>`;
   const btnMs=document.createElement("button"); btnMs.className="btn"; btnMs.textContent=t("tab_masters");
   btnMs.onclick=()=>switchTab("masters");
   r2.appendChild(btnMs); cardSrv.appendChild(r2);
   elBook.appendChild(cardSrv);
 
-  // 3. дата
   const cardDate = document.createElement("div"); cardDate.className="card";
   const rr = document.createElement("div"); rr.className="row"; rr.innerHTML=`<div class="h">${t("choose_date")}</div>`;
   cardDate.appendChild(rr);
@@ -279,16 +219,14 @@ function renderBook(){
   cardDate.appendChild(g);
   elBook.appendChild(cardDate);
 
-  // 4. время
   const cardTime=document.createElement("div"); cardTime.className="card";
   const rtt=document.createElement("div"); rtt.className="row"; rtt.innerHTML=`<div class="h">${t("choose_time")}</div>`;
   cardTime.appendChild(rtt);
-
   const timesWrap=document.createElement("div"); timesWrap.className="row"; timesWrap.style.flexWrap="wrap"; timesWrap.style.gap="10px";
   if(state.dateISO){
     const [y,m,d]=state.dateISO.split("-").map(Number);
     const slots = genSlots(new Date(y, m-1, d))
-      .filter(tm => !state.booked.has(`${state.dateISO}|${tm}|${state.masterId||"-"}`)); // пример, если отметишь занятые
+      .filter(tm => !state.booked.has(`${state.dateISO}|${tm}|${state.masterId||"-"}`));
     if(!slots.length){
       const empty=document.createElement("div"); empty.className="empty"; empty.textContent=t("empty_slots");
       timesWrap.appendChild(empty);
@@ -306,7 +244,6 @@ function renderBook(){
   }
   cardTime.appendChild(timesWrap); elBook.appendChild(cardTime);
 
-  // 5. форма
   const cardForm=document.createElement("div"); cardForm.className="card";
   const fr=document.createElement("div"); fr.className="row"; fr.style.flexDirection="column"; fr.style.gap="10px";
   fr.innerHTML = `
@@ -321,20 +258,15 @@ function renderBook(){
     <div class="field">
       <label>${t("comment")}</label>
       <input class="input" id="inp-comment" placeholder="${t("comment")}" value="${state.comment||""}">
-    </div>
-  `;
+    </div>`;
   cardForm.appendChild(fr); elBook.appendChild(cardForm);
 
-  // 6. подсказка
   const alert=document.createElement("div"); alert.className="alert"; alert.textContent=i18n[LANG].info_text;
   elBook.appendChild(alert);
 
-  // footer button state
   const ok = !!(state.serviceId && state.masterId && state.dateISO && state.time);
-  elSend.disabled = !ok;
-  elSend.style.opacity = ok ? "1" : ".6";
+  elSend.disabled = !ok; elSend.style.opacity = ok ? "1" : ".6";
 
-  // слушатели полей
   setTimeout(()=>{
     const n=document.getElementById("inp-name"); const p=document.getElementById("inp-phone"); const c=document.getElementById("inp-comment");
     n.oninput=()=>state.name=n.value.trim();
@@ -343,22 +275,15 @@ function renderBook(){
   },0);
 }
 
-/* INFO */
 function renderInfo(){
   elInfo.innerHTML="";
   const card=document.createElement("div"); card.className="card";
   const r=document.createElement("div"); r.className="row";
-  r.innerHTML = `
-    <div>
-      <div class="h">BARBER</div>
-      <div class="muted">${i18n[LANG].info_text}</div>
-      <div class="muted" style="margin-top:8px">Тел.: +7 700 000-00-00 · Адрес: г. Костанай</div>
-    </div>`;
+  r.innerHTML = `<div><div class="h">BARBER</div><div class="muted">${i18n[LANG].info_text}</div><div class="muted" style="margin-top:8px">Тел.: +7 700 000-00-00 · Адрес: г. Костанай</div></div>`;
   card.appendChild(r); elInfo.appendChild(card);
 }
 
-/* ===== Отправка в бота ===== */
-elSend.addEventListener("click", ()=>{
+document.getElementById("btn-send").addEventListener("click", ()=>{
   if(!(state.serviceId && state.masterId && state.dateISO && state.time)) return;
 
   const service = services.find(s=>s.id===state.serviceId);
@@ -383,29 +308,24 @@ elSend.addEventListener("click", ()=>{
   };
 
   try{
-    if(tg){
-      tg.sendData(JSON.stringify(payload));       // отправляем в бота
-      tg.showPopup && tg.showPopup({title:"OK", message:i18n[LANG].booked_ok}); // остаёмся в апке
+    if (tg && typeof tg.sendData === "function"){
+      tg.HapticFeedback?.impactOccurred?.("light");
+      tg.sendData(JSON.stringify(payload));
+      tg.showAlert?.(i18n[LANG].booked_ok);
     } else {
-      alert("TG disabled\n" + JSON.stringify(payload,null,2));
+      alert("Откройте мини-аппу через кнопку у бота. В браузере отправка недоступна.");
     }
   }catch(e){
-    console.error(e);
     alert("Send error: " + e.message);
   }
 });
 
-/* ===== Навигация и язык ===== */
-document.querySelectorAll(".tab").forEach(el=>{
-  el.addEventListener("click", ()=> switchTab(el.dataset.tab));
-});
+document.querySelectorAll(".tab").forEach(el=>el.addEventListener("click", ()=> switchTab(el.dataset.tab)));
 document.getElementById("lang-ru").onclick=()=>setLang("ru");
 document.getElementById("lang-kz").onclick=()=>setLang("kz");
 
-/* ===== INIT ===== */
-setLang("ru");
-switchTab("services");
-renderServices(); renderMasters(); renderBook(); renderInfo();
+setLang("ru"); switchTab("services");
+(function init(){ renderServices(); renderMasters(); renderBook(); renderInfo(); })();
 </script>
 </body>
 </html>
